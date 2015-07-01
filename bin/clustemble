@@ -1,0 +1,10 @@
+#!/usr/bin/env ruby
+
+require 'trollop'
+require 'clustemble'
+
+opts = Trollop::options do
+  version Clustemble::VERSION::STRING.dup
+  opt :input, "Fasta file", :type => String, :required => true
+end
+
