@@ -92,35 +92,79 @@ module Clustemble
         starts = subgraph.starts
         # hopefully there should be only 1 start
         if starts.size == 1
-          linear = true
+          # linear = true
           # traverse the subgraph.
           start = starts[0]
           # puts "traversing graph from start point"
           # puts start
           neighbours = subgraph.neighbours(start)
-          while neighbours.size > 0 and linear
+          while neighbours.size > 0 # and linear
             if neighbours.size == 1
               n = neighbours[0]
               neighbours = subgraph.neighbours(n)
             else
-              puts "there is a fork in the graph"
-              linear = false
-              # this means something...
+              puts "there is a fork in the graph. tines : #{neighbours.size}"
+              # linear = false
+              # which fork goes the right way
+              # the right way has nodes that have `id` on them
+              right_way = nil
+              neighbours.each do |n|
+                list_of_contigs = @graph.get_node_value(n)
+                puts "neighbour #{n} has contigs #{list_of_contigs.join(",")}"
+                puts "id is #{id}"
+                if list_of_contigs.include?(id)
+                  #this is the right way
+                  right_way = n
+                  puts "the right way is #{right_way}"
+                  set = set & list_of_contigs
+                  puts "set is now #{set.to_a}"
+                end
+              end
+              unless right_way.nil?
+                neighbours = subgraph.neighbours(right_way)
+              end
+              # remove the contigs from the set that were in the other fork
+              # of the graph
             end
           end
-          if linear
+          # if linear
             # puts "is linear!"
             # rename all the kmers in this subgraph to just come from one
             # contig
             rename = set.to_a.min
+            puts "renaming:"
+            puts "set is now #{set.to_a}"
             subgraph.nodes.each do |node_id, value|
-              # puts "setting #{node_id} value to #{rename}"
               # subgraph.set_node_value([rename], node_id)
-              @graph.set_node_value([rename], node_id)
+              # only rename nodes that contain only items in the set
+              # and nothing else
+              # if set + @graph.get_node_value(node_id) == set
+                # puts "setting #{node_id} value from #{@graph.get_node_value(node_id)} to #{rename}"
+                # @graph.set_node_value([rename], node_id)
+              # end
+
+              # if the node contains all the items in the set
+              # remove the items from the set and replace with the min of the
+              # set. keep everything else that is already there
+              # for example. the node is 1,2,3 and the set is 1,3 then rename
+              # is 1 so the node becomes 1,2
+
+              # tmp = list - set.to_a
+              # tmp << set.to_a.min
+
+              # if the intersect of the node value and the set contains id
+              if (set & @graph.get_node_value(node_id) ).include?(id)
+                tmp = @graph.get_node_value(node_id) - set.to_a
+                tmp << rename
+                tmp.sort!
+                puts "setting #{node_id} value from #{@graph.get_node_value(node_id)} to #{tmp}"
+                @graph.set_node_value(tmp, node_id)
+              end
+
             end
-          else
+          # else
             #
-          end
+          # end
         else
           puts "eek, this shouldn't really happen"
         end
@@ -129,6 +173,7 @@ module Clustemble
     end
 
     def extract_seqs
+      # puts "extracting all sequences from the graph!"
       # go through all the nodes and get a list of the names of the contigs
       # that are contained within the graph
       set = Set.new
@@ -141,46 +186,48 @@ module Clustemble
       # print "set:  "
       # p set
       starts = @graph.starts
-      # print "starts:  "
-      # p starts
       # for each contig id in the graph
       #   find the first kmer that has that id on it
       #   this is not necessarily a kmer with in_degree of 0
       seqs = {}
       set.each do |id|
-        if @graph.get_node_value(starts[0]).include?(id)
-          # puts "found first kmer"
-          neighbours = @graph.neighbours(starts[0])
-          seq = "#{starts[0]}"
-          while neighbours.size > 0
-            next_kmer = ""
-            neighbours.each do |kmer|
-              list = @graph.get_node_value(kmer)
-              if list.include?(id)
-                next_kmer = kmer
-              end
-            end
-            if next_kmer != ""
-              seq << next_kmer[-1]
-              neighbours = @graph.neighbours(next_kmer)
-            else
-              neighbours = []
+        # puts "id: #{id}"
+        start = @graph.first_node_with id
+        # puts "starting at #{start}"
+        # puts "found first kmer"
+        neighbours = @graph.neighbours(start)
+        seq = "#{starts[0]}"
+        while neighbours.size > 0
+          next_kmer = ""
+          # puts "there are #{neighbours.size} neighbours"
+          neighbours.each do |kmer|
+            list = @graph.get_node_value(kmer)
+            if list.include?(id)
+              next_kmer = kmer
+              # puts "#{list.join(",")} includes #{id}. setting next kmer to #{next_kmer}"
             end
           end
-          # puts ">contig_#{id}"
-          # puts seq
-          seqs[id]=seq
-        else
-          # look through the graph until find a kmer with `id` on it
+          if next_kmer != ""
+            seq << next_kmer[-1]
+            # puts "seq: #{seq}"
+            neighbours = @graph.neighbours(next_kmer)
+          else
+            neighbours = []
+          end
         end
+        # puts ">contig_#{id}"
+        # puts seq
+        seqs[id]=seq
+        # else
+          # look through the graph until find a kmer with `id` on it
+          # puts "didn't find kmer with contig at the start of the graph"
+        # end
       end
       # then traverse the graph for each contig pulling out that sequence
       return seqs
     end
 
-
     # __________________________________ ____________________________________
-
 
     # def add_seq id, seq
     #   kmers = kmerise seq

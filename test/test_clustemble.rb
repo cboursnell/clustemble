@@ -49,49 +49,60 @@ class TestClustemble < Test::Unit::TestCase
     #   @clust.extract_seqs
     # end
 
-    should "combine overlapping sequences" do
-      seq0 = "TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
-      seq1 ="TCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
-      seq2 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAG"
-      @clust.add_seq 0, seq1
-      @clust.add_seq 1, seq2
-      assert_equal 15, @clust.graph.size
-      seqs = @clust.extract_seqs
-      assert_equal 0, seqs.keys.first
-      assert_equal seq0, seqs.values.first
-    end
+    # should "combine overlapping sequences" do
+    #   seq0 = "TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+    #   seq1 ="TCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+    #   seq2 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAG"
+    #   @clust.add_seq 0, seq1
+    #   @clust.add_seq 1, seq2
+    #   assert_equal 15, @clust.graph.size
+    #   seqs = @clust.extract_seqs
+    #   assert_equal 0, seqs.keys.first
+    #   assert_equal seq0, seqs.values.first
+    # end
 
-    should "combine three overlapping sequences " do
-      seq3 = "CACAAAACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTATAAGCAAATGGCAAA"
-      seq3 << "CTATATTTATCATCAAATGTCAAGATGCATCTAAT"
-      seq1 = "CACAAAACTAAGATCTTGTTCATTTCCTATGAC"
-      seq2 = "CTATATTTATCATCAAATGTCAAGATGCATCTAAT"
+    # should "combine three overlapping sequences " do
+    #   seq3 = "CACAAAACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTATAAGCAAATGGCAAA"
+    #   seq3 << "CTATATTTATCATCAAATGTCAAGATGCATCTAAT"
+    #   seq1 = "CACAAAACTAAGATCTTGTTCATTTCCTATGAC"
+    #   seq2 = "CTATATTTATCATCAAATGTCAAGATGCATCTAAT"
+    #   @clust.add_seq 1, seq1
+    #   assert_equal 3, @clust.graph.size
+    #   @clust.add_seq 2, seq2
+    #   assert_equal 8, @clust.graph.size
+    #   assert_equal 2, @clust.graph.starts.size
+    #   @clust.add_seq 3, seq3
+    #   assert_equal 1, @clust.graph.starts.size
+    #   assert_equal 66, @clust.graph.size
+    #   assert_equal seq3, @clust.extract_seqs[1]
+    # end
+
+    #TGTTCATTTCCTATGACAATAACATTATTAC
+
+    should "return two sequences" do
+      seq1 =  "CACAAAACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTA"
+      seq1 << "TAAGCAAATGGCAAA"
+      seq1 << "CTATATTTATCATCAAATGTCAAGATGCATCTAAT"
+      seq2 =  "CACAAAACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTA"
+      seq2 << "CTATATTTATCATCAAATGTCAAGATGCATCTAAT"
+      seq3 =       "AACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTA"
+      seq3 << "TAAGCA"
+
+      puts "TEST: adding contig id 1"
       @clust.add_seq 1, seq1
-      assert_equal 3, @clust.graph.size
+      assert_equal 66, @clust.graph.size, "graph size after adding seq1"
+      puts "TEST: adding contig id 2"
       @clust.add_seq 2, seq2
-      assert_equal 8, @clust.graph.size
-      assert_equal 2, @clust.graph.starts.size
+      assert_equal 95, @clust.graph.size, "graph size after adding seq2"
+      assert_equal 2, @clust.extract_seqs.size, "extracted seq size"
+
+      puts "TEST: adding contig id 3"
       @clust.add_seq 3, seq3
-      assert_equal 1, @clust.graph.starts.size
-      assert_equal 66, @clust.graph.size
-      p @clust.extract_seqs
-
+      seqs = @clust.extract_seqs
+      assert_equal 2, seqs.size
+      assert_equal seq1, seqs[1], "seq1"
+      assert_equal seq2, seqs[2], "seq2"
     end
-
-    # should "find starts" do
-    #   file = File.join(File.dirname(__FILE__), 'data', 'cluster.fa')
-    #   @clust.add_fasta file
-    #   list = @clust.find_starts
-    #   assert_equal "CACAAAACTAAGATCTTGTTCATTTCCTATG", list[0]
-    # end
-
-
-    # should "keep sequence because it's a different isoform" do
-    #   @clust.add_seq 0, "TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
-    #   @clust.add_seq 1, "TTGGAATCGGTGACCGGCATTTTGACAGAACTCGAGGCGATT"
-    #   assert_equal 27, @clust.graph.size, "graph size"
-    #   @clust.align_seq(1, "TTGGAATCGGTGACCGGCATTTTGACAGAACTCGAGGCGATT")
-    # end
 
   end
 

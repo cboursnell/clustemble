@@ -114,6 +114,18 @@ module Clustemble
       degrees.keys
     end
 
+    def first_node_with id
+      first = nil
+      @nodes.each do |node_id, list|
+        list.value.each do |contig_id|
+          if contig_id==id and first.nil?
+            first = node_id
+          end
+        end
+      end
+      return first
+    end
+
     def size
       @nodes.size
     end
