@@ -41,7 +41,9 @@ module Clustemble
     # 8) profit???
 
     def add_seq id, seq
+      puts "\nADDING SEQUENCE: ID #{id}"
       kmers = kmerise seq
+      puts "kmerised sequence to #{kmers.size} kmers"
       # add the kmers as nodes to the graph
       # if they already exist add the contig id to the existing node
       set = Set.new
@@ -62,6 +64,7 @@ module Clustemble
         end
       end
       if set.empty?
+        puts "first contig added"
         # then this contig that was added didn't overlap with anything
         # it was probably the first contig to be added
       else
@@ -69,6 +72,8 @@ module Clustemble
         # move to step (3)
         # pull out all the kmers that have the contigs from the set on them
         subgraph = AdjacencyList.new
+        puts "building subgraph. looking for nodes with id: #{id}"
+        puts "set is now #{set.to_a}"
         @graph.nodes.each do |node_id, list|
           list.value.each do |contig_id|
             if set.include?(contig_id)
@@ -77,6 +82,7 @@ module Clustemble
             end
           end
         end
+        puts "added nodes to subgraph. subgraph contains #{subgraph.size} nodes"
         # go back through subgraph and get edges from main graph
         # because you can't add edges from nodes that exist to nodes that don't
         # exist yet
@@ -95,13 +101,14 @@ module Clustemble
           # linear = true
           # traverse the subgraph.
           start = starts[0]
-          # puts "traversing graph from start point"
+          puts "traversing graph from start point: #{start} contigs:#{@graph.get_node_value(start).join(",")}"
           # puts start
           neighbours = subgraph.neighbours(start)
           while neighbours.size > 0 # and linear
             if neighbours.size == 1
               n = neighbours[0]
               neighbours = subgraph.neighbours(n)
+              puts "next node is #{n} contigs:#{@graph.get_node_value(n).join(",")}"
             else
               puts "there is a fork in the graph. tines : #{neighbours.size}"
               # linear = false
@@ -122,46 +129,69 @@ module Clustemble
               end
               unless right_way.nil?
                 neighbours = subgraph.neighbours(right_way)
+              else
+                puts "couldn't find id:#{id} on immediate neighbours"
+                # search forward along both paths of the fork until either
+                # 1) the two arms of the fork meet up. (don't try this)
+                # 2) a kmer is found with `id` on it (try this!)
+
+                # can probably replace the examination of the neighbours above
+                # with this approach below as it basically does the same thing
+                queue = []
+                # add neighbours to queue with markers to say which is which
+                neighbours.each_with_index do |n, index|
+                  queue << [n, index]
+                end
+                found = -1
+                while queue.size > 0 and found < 0
+                  front = queue.shift # get the first item and remove it
+                  puts "   searching: #{front[0]} from path #{front[1]}. contigs #{subgraph.get_node_value(front[0]).join(",")}"
+                  if subgraph.get_node_value(front[0]).include?(id)
+                    # found it
+                    found = front[1]
+                    puts "found a kmer with #{id} on it. found=#{found}"
+                  else
+                    nbs = subgraph.neighbours(front[0])
+                    nbs.each do |n|
+                      queue << [n, front[1]]
+                    end
+                  end
+                end
+                if found >= 0
+                  right_way = neighbours[found]
+                  neighbours = subgraph.neighbours(right_way)
+                else
+                  puts "something went really wrong"
+                  abort "sorry"
+                end
               end
               # remove the contigs from the set that were in the other fork
               # of the graph
             end
           end
           # if linear
-            # puts "is linear!"
-            # rename all the kmers in this subgraph to just come from one
-            # contig
-            rename = set.to_a.min
-            puts "renaming:"
-            puts "set is now #{set.to_a}"
-            subgraph.nodes.each do |node_id, value|
-              # subgraph.set_node_value([rename], node_id)
-              # only rename nodes that contain only items in the set
-              # and nothing else
-              # if set + @graph.get_node_value(node_id) == set
-                # puts "setting #{node_id} value from #{@graph.get_node_value(node_id)} to #{rename}"
-                # @graph.set_node_value([rename], node_id)
-              # end
+          # puts "is linear!"
+          # rename all the kmers in this subgraph to just come from one
+          # contig
+          rename = set.to_a.min
+          puts "renaming:"
+          puts "set is now #{set.to_a}"
+          subgraph.nodes.each do |node_id, value|
+            # if the node contains all the items in the set
+            # remove the items from the set and replace with the min of the
+            # set. keep everything else that is already there
+            # for example. the node is 1,2,3 and the set is 1,3 then rename
+            # is 1 so the node becomes 1,2
 
-              # if the node contains all the items in the set
-              # remove the items from the set and replace with the min of the
-              # set. keep everything else that is already there
-              # for example. the node is 1,2,3 and the set is 1,3 then rename
-              # is 1 so the node becomes 1,2
-
-              # tmp = list - set.to_a
-              # tmp << set.to_a.min
-
-              # if the intersect of the node value and the set contains id
-              if (set & @graph.get_node_value(node_id) ).include?(id)
-                tmp = @graph.get_node_value(node_id) - set.to_a
-                tmp << rename
-                tmp.sort!
-                puts "setting #{node_id} value from #{@graph.get_node_value(node_id)} to #{tmp}"
-                @graph.set_node_value(tmp, node_id)
-              end
-
+            if (set & @graph.get_node_value(node_id) ).include?(id)
+              tmp = @graph.get_node_value(node_id) - set.to_a
+              tmp << rename
+              tmp.sort!
+              # puts "setting #{node_id} value from #{@graph.get_node_value(node_id)} to #{tmp}"
+              @graph.set_node_value(tmp, node_id)
             end
+
+          end
           # else
             #
           # end
@@ -169,7 +199,7 @@ module Clustemble
           puts "eek, this shouldn't really happen"
         end
 
-      end
+      end # set.empty?
     end
 
     def extract_seqs
@@ -194,7 +224,6 @@ module Clustemble
         # puts "id: #{id}"
         start = @graph.first_node_with id
         # puts "starting at #{start}"
-        # puts "found first kmer"
         neighbours = @graph.neighbours(start)
         seq = "#{starts[0]}"
         while neighbours.size > 0
@@ -227,144 +256,73 @@ module Clustemble
       return seqs
     end
 
-    # __________________________________ ____________________________________
 
-    # def add_seq id, seq
-    #   kmers = kmerise seq
-    #   (0..kmers.length-1).each do |index|
-    #     if index > 0
-    #       node_a = kmers[index-1]
+
+    # def find_path start
+    #   path = []
+    #   puts "start: #{start}"
+    #   path = search path, start
+    #   path
+    # end
+
+    # def search_recursive path, kmer
+    #   puts "path length: #{path.size}\tkmer: #{kmer}"
+    #   neighbours = @graph.adjacent_vertices(kmer)
+    #   if neighbours.size == 0
+    #     path << kmer
+    #     return path
+    #   elsif neighbours.size == 1
+    #     path << kmer
+    #     return search path, neighbours[0]
+    #   elsif neighbours.size > 1
+    #     paths = []
+    #     neighbours.each do |n|
+    #       paths << search(path.dup, n)
     #     end
-    #     node_b = kmers[index]
-    #     if @graph.exists?(node_b)
-    #       puts "adding a value to existing node #{node_b}"
-    #       @graph.add_node_value(node_b, id)
-    #     else
-    #       puts "creating new node #{node_b}"
-    #       @graph.add([id], node_b)
-    #     end
-    #     if index > 0
-    #       @graph.add_edge(node_a, node_b)
-    #     end
+    #     return paths
     #   end
     # end
 
-
-    # def align_seq id, seq
-    #   redundant = true
-    #   kmers = kmerise seq
-    #   first = @graph.get_node_value kmers[0]
-    #   hash = {}
-    #   if first.size == 0
-    #     puts "first size is 0 and so seq is not redundant"
-    #     redundant = false
-    #     return redundant
-    #   else
-    #     first.each { |i| hash[i] = 0 }
-    #     hash.delete id
-    #     # puts "hash with #{id} deleted"
-    #     # p hash
-    #     kmers.each do |kmer|
-    #       puts "counting kmer #{kmer}"
-    #       # get the contigs that have this kmer
-    #       contigs = @graph.get_node_value(kmer)
-    #       # print "contigs: "
-    #       # p contigs
-    #       # for each contig add 1 to the total counts
-    #       contigs.each do |contig|
-    #         if hash.key?(contig)
-    #           puts "adding 1 to #{contig} in hash"
-    #           hash[contig] += 1
+    # def traverse start
+    #   seq = []
+    #   seq << start
+    #   last = false
+    #   while !finished(seq)
+    #     (0..seq.size-1).each do |i|
+    #       kmer = last_kmer seq[i]
+    #       if @graph.has_vertex?(kmer)
+    #         neighbours = @graph.adjacent_vertices(kmer)
+    #         if neighbours.size > 1
+    #           puts "seq #{i}\tkmer #{kmer}\tneighbours: #{neighbours.size}"
+    #           str = seq[i].dup
+    #           # add the last character of the first neighbour
+    #           seq[i] << neighbours[0][-1]
+    #           # add the last character of the next neighbours
+    #           (1..neighbours.size-1).each do |j|
+    #             # and make a new sequence
+    #             seq << "#{str}#{neighbours[j][-1]}"
+    #           end
+    #         elsif neighbours.size == 1
+    #           seq[i] << neighbours[0][-1]
+    #         else
+    #           # puts "last kmer: #{kmer}"
+    #           seq[i] << "|"
     #         end
     #       end
-    #       # print "hash: "
-    #       # p hash
-    #     end
-    #     #
-    #     hash.each do |k,v|
-    #       puts "v: #{v} size: #{kmers.size}"
-    #       if v == kmers.size
-    #         puts "#{id} is totally contained by #{k}"
-    #         return redundant
-    #       elsif v < kmers.size
-    #         puts "v: #{v} less than kmers: #{kmers.size}"
-    #         # have to find out if sequence is like
-    #         # ***************------    in this situation you want to merge
-    #         # --------*************    0 and 1
-    #         #  or:
-    #         # *********************    in this situation you want to keep
-    #         # ******--------*******    0 and 1 as separate sequences in output
-    #       end
     #     end
     #   end
+    #   seq
     # end
 
-
-    def find_path start
-      path = []
-      puts "start: #{start}"
-      path = search path, start
-      path
-    end
-
-    def search_recursive path, kmer
-      puts "path length: #{path.size}\tkmer: #{kmer}"
-      neighbours = @graph.adjacent_vertices(kmer)
-      if neighbours.size == 0
-        path << kmer
-        return path
-      elsif neighbours.size == 1
-        path << kmer
-        return search path, neighbours[0]
-      elsif neighbours.size > 1
-        paths = []
-        neighbours.each do |n|
-          paths << search(path.dup, n)
-        end
-        return paths
-      end
-    end
-
-    def traverse start
-      seq = []
-      seq << start
-      last = false
-      while !finished(seq)
-        (0..seq.size-1).each do |i|
-          kmer = last_kmer seq[i]
-          if @graph.has_vertex?(kmer)
-            neighbours = @graph.adjacent_vertices(kmer)
-            if neighbours.size > 1
-              puts "seq #{i}\tkmer #{kmer}\tneighbours: #{neighbours.size}"
-              str = seq[i].dup
-              # add the last character of the first neighbour
-              seq[i] << neighbours[0][-1]
-              # add the last character of the next neighbours
-              (1..neighbours.size-1).each do |j|
-                # and make a new sequence
-                seq << "#{str}#{neighbours[j][-1]}"
-              end
-            elsif neighbours.size == 1
-              seq[i] << neighbours[0][-1]
-            else
-              # puts "last kmer: #{kmer}"
-              seq[i] << "|"
-            end
-          end
-        end
-      end
-      seq
-    end
-
-    def finished seq
-      done = true
-      seq.each do |s|
-        if s[-1] != "|"
-          done = false
-        end
-      end
-      done
-    end
+    # def finished seq
+    #   done = true
+    #   seq.each do |s|
+    #     if s[-1] != "|"
+    #       done = false
+    #     end
+    #   end
+    #   done
+    # end
 
     def last_kmer seq
       return seq[-@kmer..-1]
@@ -372,9 +330,17 @@ module Clustemble
 
     # returns a list of kmers
     def kmerise seq
+      hash = {}
       list = []
       (0..seq.length-@kmer).each do |i|
-        list << (seq[i..(i+@kmer-1)]).upcase
+        kmer = (seq[i..(i+@kmer-1)]).upcase
+        list << kmer
+        if hash.key?(kmer)
+          puts "this is bad. the same kmer is in this sequence twice"
+          puts "i think this might lead to problems"
+        end
+        hash[kmer]||=0
+        hash[kmer]+=1
       end
       # list.each do |s|
       #   puts s

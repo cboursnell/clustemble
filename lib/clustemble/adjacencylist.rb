@@ -11,16 +11,18 @@ module Clustemble
     def initialize
       @nodes = {}
       @edges = {}
+      @back_edges = {}
     end
 
     # Assignment - adds a new node with +:value+, and
     # +:nodeidentifier+, and optionally an array of
     # identifiers of other nodes defining +:edges+.
     # Returns self, so that assignments can be chained.
-    def add(value, nodeidentifier, edges=Array.new)
+    def add(value, nodeidentifier)
       node = ALNode.new(value)
       @nodes[nodeidentifier] = node
-      @edges[nodeidentifier] = edges
+      @edges[nodeidentifier] = []
+      @back_edges[nodeidentifier] = []
       self
     end
 
@@ -31,6 +33,7 @@ module Clustemble
       node = @nodes[nodeidentifier]
       @nodes[nodeidentifier] = nil
       @edges.delete node
+      @back_edges.delete node
     end
 
     # Removal - deletes the edge(s) +:edges+ connected to the node
@@ -66,6 +69,11 @@ module Clustemble
         if @edges.key?(x)
           unless @edges[x].include?(y)
             @edges[x] << y
+          end
+        end
+        if @back_edges.key?(y)
+          unless @back_edges[y].include?(x)
+            @back_edges[y] << x
           end
         end
       else
@@ -117,12 +125,37 @@ module Clustemble
     def first_node_with id
       first = nil
       @nodes.each do |node_id, list|
+
         list.value.each do |contig_id|
           if contig_id==id and first.nil?
             first = node_id
           end
         end
       end
+      # then check if there are any edges that go from a node to this node
+      # and the from node has `id` on it
+
+      # using back edges trace from this node backwards
+
+      found = true
+      while found
+        found = false
+        previous = @back_edges[first]
+        if previous.size == 1
+          if @nodes[previous[0]].value.include?(id)
+            first = previous[0]
+            found = true
+          end
+        else
+          previous.each do |n|
+            if @nodes[n].value.include?(id)
+              first = n
+              found = true
+            end
+          end
+        end
+      end
+
       return first
     end
 

@@ -22,8 +22,8 @@ class TestAdjacencyList < Test::Unit::TestCase
       @graph.add(0, "ACGT")
       @graph.add(0, "CGTT")
       @graph.add_edge("ACGT", "CGTT")
-      assert_equal 2, @graph.size
-      assert_equal 1, @graph.num_edges
+      assert_equal 2, @graph.size, "graph size"
+      assert_equal 1, @graph.num_edges, "number of edges"
     end
 
     should "add two nodes, connect them and get the degree" do
@@ -32,8 +32,8 @@ class TestAdjacencyList < Test::Unit::TestCase
       @graph.add(0, node1)
       @graph.add(0, node2)
       @graph.add_edge(node1, node2)
-      assert_equal 1, @graph.in_degree(node2)
-      assert_equal 1, @graph.out_degree(node1)
+      assert_equal 1, @graph.in_degree(node2), "in degree"
+      assert_equal 1, @graph.out_degree(node1), "out degree"
     end
 
     should "find start nodes" do
@@ -79,6 +79,18 @@ class TestAdjacencyList < Test::Unit::TestCase
       @graph.add_edge(node1, node2)
       @graph.add_edge(node1, node2)
       assert_equal 1, @graph.edges[node1].size
+    end
+
+    should "get first node with specific id" do
+      node1 = "CGTT"
+      node2 = "ACGT"
+      node3 = "AACG"
+      @graph.add([1], node1)
+      @graph.add([1], node2)
+      @graph.add([1], node3)
+      @graph.add_edge(node3, node2)
+      @graph.add_edge(node2, node1)
+      assert_equal node3, @graph.first_node_with(1), "first node"
     end
 
   end
