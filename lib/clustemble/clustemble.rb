@@ -90,7 +90,11 @@ module Clustemble
           neighbour = @graph.edges[node_id]
           if neighbour.size > 0
             neighbour.each do |kmer|
-              subgraph.add_edge(node_id, kmer)
+              if (set & @graph.get_node_value(kmer)).size>0
+                subgraph.add_edge(node_id, kmer)
+              else
+                puts "not adding edge between #{node_id} and #{kmer}"
+              end
             end
           end
         end
@@ -108,7 +112,7 @@ module Clustemble
             if neighbours.size == 1
               n = neighbours[0]
               neighbours = subgraph.neighbours(n)
-              puts "next node is #{n} contigs:#{@graph.get_node_value(n).join(",")}"
+              # puts "next node is #{n} contigs:#{@graph.get_node_value(n).join(",")}"
             else
               puts "there is a fork in the graph. tines : #{neighbours.size}"
               # linear = false
@@ -145,7 +149,7 @@ module Clustemble
                 found = -1
                 while queue.size > 0 and found < 0
                   front = queue.shift # get the first item and remove it
-                  puts "   searching: #{front[0]} from path #{front[1]}. contigs #{subgraph.get_node_value(front[0]).join(",")}"
+                  # puts "   searching: #{front[0]} from path #{front[1]}. contigs #{subgraph.get_node_value(front[0]).join(",")}"
                   if subgraph.get_node_value(front[0]).include?(id)
                     # found it
                     found = front[1]
@@ -256,74 +260,6 @@ module Clustemble
       return seqs
     end
 
-
-
-    # def find_path start
-    #   path = []
-    #   puts "start: #{start}"
-    #   path = search path, start
-    #   path
-    # end
-
-    # def search_recursive path, kmer
-    #   puts "path length: #{path.size}\tkmer: #{kmer}"
-    #   neighbours = @graph.adjacent_vertices(kmer)
-    #   if neighbours.size == 0
-    #     path << kmer
-    #     return path
-    #   elsif neighbours.size == 1
-    #     path << kmer
-    #     return search path, neighbours[0]
-    #   elsif neighbours.size > 1
-    #     paths = []
-    #     neighbours.each do |n|
-    #       paths << search(path.dup, n)
-    #     end
-    #     return paths
-    #   end
-    # end
-
-    # def traverse start
-    #   seq = []
-    #   seq << start
-    #   last = false
-    #   while !finished(seq)
-    #     (0..seq.size-1).each do |i|
-    #       kmer = last_kmer seq[i]
-    #       if @graph.has_vertex?(kmer)
-    #         neighbours = @graph.adjacent_vertices(kmer)
-    #         if neighbours.size > 1
-    #           puts "seq #{i}\tkmer #{kmer}\tneighbours: #{neighbours.size}"
-    #           str = seq[i].dup
-    #           # add the last character of the first neighbour
-    #           seq[i] << neighbours[0][-1]
-    #           # add the last character of the next neighbours
-    #           (1..neighbours.size-1).each do |j|
-    #             # and make a new sequence
-    #             seq << "#{str}#{neighbours[j][-1]}"
-    #           end
-    #         elsif neighbours.size == 1
-    #           seq[i] << neighbours[0][-1]
-    #         else
-    #           # puts "last kmer: #{kmer}"
-    #           seq[i] << "|"
-    #         end
-    #       end
-    #     end
-    #   end
-    #   seq
-    # end
-
-    # def finished seq
-    #   done = true
-    #   seq.each do |s|
-    #     if s[-1] != "|"
-    #       done = false
-    #     end
-    #   end
-    #   done
-    # end
-
     def last_kmer seq
       return seq[-@kmer..-1]
     end
@@ -338,6 +274,7 @@ module Clustemble
         if hash.key?(kmer)
           puts "this is bad. the same kmer is in this sequence twice"
           puts "i think this might lead to problems"
+          abort "sorry"
         end
         hash[kmer]||=0
         hash[kmer]+=1

@@ -110,12 +110,12 @@ class TestClustemble < Test::Unit::TestCase
       assert_equal seq2, seqs[2], "seq2"
     end
 
-    # should "run on an actual fasta file" do
-    #   file = File.join(File.dirname(__FILE__), 'data', 'cluster.fa')
-    #   @clust.add_fasta file
-    #   seqs = @clust.extract_seqs
-    #   assert_equal 4, seqs.size
-    # end
+    should "run on an actual fasta file" do
+      file = File.join(File.dirname(__FILE__), 'data', 'cluster.fa')
+      @clust.add_fasta file
+      seqs = @clust.extract_seqs
+      assert_equal 4, seqs.size
+    end
 
     should "run on another actual fasta file" do
       file = File.join(File.dirname(__FILE__), 'data', 'test4.fa')
