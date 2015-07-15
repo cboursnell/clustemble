@@ -15,11 +15,20 @@ module Clustemble
       @contigs = []
     end
 
+    def consensus file, name
+      add_fasta file
+      seqs = extract_seqs
+      fasta = ""
+      seqs.each.with_index do |(n, seq), i|
+        fasta << ">#{name}.#{i+1}\n"
+        fasta << "#{seq}\n"
+      end
+      return fasta
+    end
+
     def add_fasta file
-      index = 0
       Bio::FastaFormat.open(file).each do |entry|
-        add_seq index, entry.seq.seq
-        index += 1
+        add_seq entry.entry_id, entry.seq.seq
       end
     end
 
@@ -27,183 +36,99 @@ module Clustemble
       @graph.starts.keys
     end
 
-    # 1) Kmerise contig 1 and build a graph from it. Mark each kmer that
-    #    it came from contig 1
-    # 2) Kmerise contig 2 and add it to the graph. Find the contig id of all the
-    #    contigs that overlap with the kmers from contig 2.
-    # 3) Construct a subgraph that contains only the kmers that come from the
-    #    contigs found in step 2.
-    # 4) Find the start point in this subgraph and traverse it.
-    # 5) if there is no fork rename all kmers to match the name of the longest
-    #    contig
-    # 6) if there is a fork then keep contigs the same
-    # 7) um...
-    # 8) profit???
-
     def add_seq id, seq
-      puts "\nADDING SEQUENCE: ID #{id}"
+      # kmerise the input sequence in an array of kmers
       kmers = kmerise seq
-      puts "kmerised sequence to #{kmers.size} kmers"
-      # add the kmers as nodes to the graph
-      # if they already exist add the contig id to the existing node
+      # puts "kmers size: #{kmers.size}"
+      # make a set to store all contigs that `seq` overlaps
       set = Set.new
       kmers.each_with_index do |kmer, index|
-        if @graph.exist? (kmer)
-          @graph.add_node_value(id, kmer)
-          # get the ids of all contigs that these kmers overlap
-          contig_list = @graph.get_node_value(kmer)
-          contig_list.each do |contig|
-            set << contig
-          end
-        else
-          @graph.add([id], kmer)
+        # def add(nodeidentifier, contig, index)
+        @graph.add(kmer, id, index)
+        # get list of contigs on this kmer
+        @graph.get_node_contigs(kmer).each do |contig,index|
+          # add contig to set
+          set << contig
         end
         # add edge between kmers
         if index > 0
           @graph.add_edge(kmers[index-1], kmer)
         end
       end
-      if set.empty?
-        puts "first contig added"
-        # then this contig that was added didn't overlap with anything
+      # puts "set: #{set.to_a.join(",")}"
+      if set.size == 1 and set & [id] == set
+        # this contig that was added doesn't overlap with anything
         # it was probably the first contig to be added
       else
-        # this contig overlapped with another when it was added
-        # move to step (3)
-        # pull out all the kmers that have the contigs from the set on them
-        subgraph = AdjacencyList.new
-        puts "building subgraph. looking for nodes with id: #{id}"
-        puts "set is now #{set.to_a}"
-        @graph.nodes.each do |node_id, list|
-          list.value.each do |contig_id|
-            if set.include?(contig_id)
-              # add graph node to sub graph
-              subgraph.add(list.value, node_id)
+        # get the first kmer that contains a contig from the set on it
+        start = @graph.first_node_from_set(set)
+        # puts "start: #{start}"
+        neighbours = @graph.neighbours(start)
+        while neighbours.size > 0
+          # print "neighbours "
+          # p neighbours
+          found = -1
+          if neighbours.size == 1
+            found = 0
+          else
+            queue = []
+            neighbours.each_with_index do |n, index|
+              queue << [n,index]
+              # puts "adding #{n} to the queue"
             end
-          end
-        end
-        puts "added nodes to subgraph. subgraph contains #{subgraph.size} nodes"
-        # go back through subgraph and get edges from main graph
-        # because you can't add edges from nodes that exist to nodes that don't
-        # exist yet
-        subgraph.nodes.each do |node_id, value|
-          neighbour = @graph.edges[node_id]
-          if neighbour.size > 0
-            neighbour.each do |kmer|
-              if (set & @graph.get_node_value(kmer)).size>0
-                subgraph.add_edge(node_id, kmer)
+            while queue.size > 0 and found < 0
+              front = queue.shift # get the first imte and remove it
+              # print "keys: "
+              # p @graph.get_node_contigs(front[0]).keys
+              if @graph.get_node_contigs(front[0]).keys.include?(id)
+                found = front[1]
+                # puts "get node contigs includes id #{id}"
               else
-                puts "not adding edge between #{node_id} and #{kmer}"
+                # puts "keep adding to the queue to search deeper"
+                nbs = @graph.neighbours(front[0])
+                nbs.each do |n|
+                  queue << [n, front[1]]
+                end
               end
             end
           end
-        end
-        # find start of subgraph
-        starts = subgraph.starts
-        # hopefully there should be only 1 start
-        if starts.size == 1
-          # linear = true
-          # traverse the subgraph.
-          start = starts[0]
-          puts "traversing graph from start point: #{start} contigs:#{@graph.get_node_value(start).join(",")}"
-          # puts start
-          neighbours = subgraph.neighbours(start)
-          while neighbours.size > 0 # and linear
-            if neighbours.size == 1
-              n = neighbours[0]
-              neighbours = subgraph.neighbours(n)
-              # puts "next node is #{n} contigs:#{@graph.get_node_value(n).join(",")}"
-            else
-              puts "there is a fork in the graph. tines : #{neighbours.size}"
-              # linear = false
-              # which fork goes the right way
-              # the right way has nodes that have `id` on them
-              right_way = nil
-              neighbours.each do |n|
-                list_of_contigs = @graph.get_node_value(n)
-                puts "neighbour #{n} has contigs #{list_of_contigs.join(",")}"
-                puts "id is #{id}"
-                if list_of_contigs.include?(id)
-                  #this is the right way
-                  right_way = n
-                  puts "the right way is #{right_way}"
-                  set = set & list_of_contigs
-                  puts "set is now #{set.to_a}"
-                end
-              end
-              unless right_way.nil?
-                neighbours = subgraph.neighbours(right_way)
+          if found >= 0
+            right_way = neighbours[found]
+            list_of_contigs = @graph.get_node_contigs(right_way).keys
+            if list_of_contigs.include?(id) and neighbours.size > 1
+              set = set & list_of_contigs
+              # puts "set is now #{set.to_a}"
+            end
+            neighbours = @graph.neighbours(right_way)
+          else
+            neighbours = []
+            puts "something went wrong"
+          end
+        end # while neighbours.size > 0
+        # puts "set: #{set.to_a}"
+        rename = set.to_a.min
+        # puts "rename: #{rename}"
+        @graph.nodes.each do |node_id, value|
+          # puts "kmer #{node_id} contigs: #{@graph.get_node_contigs(node_id).keys}"
+          if (set & @graph.get_node_contigs(node_id).keys ).include?(id)
+            hash = @graph.get_node_contigs(node_id)
+            tmp = hash.keys - set.to_a
+            tmp << rename
+            # tmp.sort!
+            # puts "setting kmer #{node_id} from #{@graph.get_node_contigs(node_id).keys} to #{tmp}"
+            new_hash ={}
+            tmp.each do |contig_id|
+              if hash.key?(contig_id)
+                new_hash[contig_id] = hash[contig_id]
               else
-                puts "couldn't find id:#{id} on immediate neighbours"
-                # search forward along both paths of the fork until either
-                # 1) the two arms of the fork meet up. (don't try this)
-                # 2) a kmer is found with `id` on it (try this!)
-
-                # can probably replace the examination of the neighbours above
-                # with this approach below as it basically does the same thing
-                queue = []
-                # add neighbours to queue with markers to say which is which
-                neighbours.each_with_index do |n, index|
-                  queue << [n, index]
-                end
-                found = -1
-                while queue.size > 0 and found < 0
-                  front = queue.shift # get the first item and remove it
-                  # puts "   searching: #{front[0]} from path #{front[1]}. contigs #{subgraph.get_node_value(front[0]).join(",")}"
-                  if subgraph.get_node_value(front[0]).include?(id)
-                    # found it
-                    found = front[1]
-                    puts "found a kmer with #{id} on it. found=#{found}"
-                  else
-                    nbs = subgraph.neighbours(front[0])
-                    nbs.each do |n|
-                      queue << [n, front[1]]
-                    end
-                  end
-                end
-                if found >= 0
-                  right_way = neighbours[found]
-                  neighbours = subgraph.neighbours(right_way)
-                else
-                  puts "something went really wrong"
-                  abort "sorry"
-                end
+                new_hash[contig_id] = 0
               end
-              # remove the contigs from the set that were in the other fork
-              # of the graph
             end
+            @graph.set_node_contigs(node_id, new_hash)
           end
-          # if linear
-          # puts "is linear!"
-          # rename all the kmers in this subgraph to just come from one
-          # contig
-          rename = set.to_a.min
-          puts "renaming:"
-          puts "set is now #{set.to_a}"
-          subgraph.nodes.each do |node_id, value|
-            # if the node contains all the items in the set
-            # remove the items from the set and replace with the min of the
-            # set. keep everything else that is already there
-            # for example. the node is 1,2,3 and the set is 1,3 then rename
-            # is 1 so the node becomes 1,2
-
-            if (set & @graph.get_node_value(node_id) ).include?(id)
-              tmp = @graph.get_node_value(node_id) - set.to_a
-              tmp << rename
-              tmp.sort!
-              # puts "setting #{node_id} value from #{@graph.get_node_value(node_id)} to #{tmp}"
-              @graph.set_node_value(tmp, node_id)
-            end
-
-          end
-          # else
-            #
-          # end
-        else
-          puts "eek, this shouldn't really happen"
         end
+      end # set.size==1
 
-      end # set.empty?
     end
 
     def extract_seqs
@@ -212,8 +137,8 @@ module Clustemble
       # that are contained within the graph
       set = Set.new
 
-      @graph.nodes.each do |node_id, list|
-        list.value.each do |contig_id|
+      @graph.nodes.each do |node_id, node|
+        node.contigs.each do |contig_id, index|
           set << contig_id
         end
       end
@@ -234,10 +159,10 @@ module Clustemble
           next_kmer = ""
           # puts "there are #{neighbours.size} neighbours"
           neighbours.each do |kmer|
-            list = @graph.get_node_value(kmer)
-            if list.include?(id)
+            hash = @graph.get_node_contigs(kmer)
+            if hash.keys.include?(id)
               next_kmer = kmer
-              # puts "#{list.join(",")} includes #{id}. setting next kmer to #{next_kmer}"
+              # puts "#{hash.keys.join(",")} includes #{id}. setting next kmer to #{next_kmer}"
             end
           end
           if next_kmer != ""
@@ -248,15 +173,8 @@ module Clustemble
             neighbours = []
           end
         end
-        # puts ">contig_#{id}"
-        # puts seq
         seqs[id]=seq
-        # else
-          # look through the graph until find a kmer with `id` on it
-          # puts "didn't find kmer with contig at the start of the graph"
-        # end
       end
-      # then traverse the graph for each contig pulling out that sequence
       return seqs
     end
 
@@ -264,26 +182,15 @@ module Clustemble
       return seq[-@kmer..-1]
     end
 
-    # returns a list of kmers
     def kmerise seq
-      hash = {}
       list = []
       (0..seq.length-@kmer).each do |i|
         kmer = (seq[i..(i+@kmer-1)]).upcase
         list << kmer
-        if hash.key?(kmer)
-          puts "this is bad. the same kmer is in this sequence twice"
-          puts "i think this might lead to problems"
-          abort "sorry"
-        end
-        hash[kmer]||=0
-        hash[kmer]+=1
       end
-      # list.each do |s|
-      #   puts s
-      # end
       list
     end
+
 
 
   end

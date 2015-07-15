@@ -1,9 +1,32 @@
 module Clustemble
 
-  # Implements an Adjacency list with indexed nodes
-  class AdjacencyList
+  require 'set'
 
-    ALNode = Struct.new(:value)
+  # Implements an Adjacency list with indexed nodes
+
+  class Node
+
+    attr_accessor :max_count, :visit_count, :contigs
+
+    def initialize contig, index
+      @index = index
+      # @max_count = 1   # i think that count might have to be specific to each
+      @visit_count = 0 # contig.
+      @contigs = Hash.new
+      @contigs[contig] = index
+    end
+
+    def add_contig(contig, index)
+      if @contigs.key?(contig)
+      else
+        @contigs[contig] = index
+        # @max_count += 1
+      end
+    end
+
+  end
+
+  class AdjacencyList
 
     attr_accessor :nodes, :edges
 
@@ -14,16 +37,24 @@ module Clustemble
       @back_edges = {}
     end
 
-    # Assignment - adds a new node with +:value+, and
-    # +:nodeidentifier+, and optionally an array of
-    # identifiers of other nodes defining +:edges+.
-    # Returns self, so that assignments can be chained.
-    def add(value, nodeidentifier)
-      node = ALNode.new(value)
-      @nodes[nodeidentifier] = node
-      @edges[nodeidentifier] = []
-      @back_edges[nodeidentifier] = []
-      self
+    def add(nodeidentifier, contig, index)
+      if @nodes.key?(nodeidentifier)
+        @nodes[nodeidentifier].add_contig(contig, index)
+      else
+        @nodes[nodeidentifier] = Node.new(contig, index)
+        @edges[nodeidentifier] = []
+        @back_edges[nodeidentifier] = []
+      end
+    end
+
+    def add_node(node, nodeidentifier)
+      if node.is_a?(Node)
+        @nodes[nodeidentifier] = node
+        @edges[nodeidentifier] = []
+        @back_edges[nodeidentifier] = []
+      else
+        raise RuntimeError.new "must add Node object"
+      end
     end
 
     # Removal - deletes the node at +:nodeidentifier+, which should be
@@ -44,18 +75,47 @@ module Clustemble
     end
 
     # Returns the value of the node with +:nodeidentifier+
-    def get_node_value nodeidentifier
-      @nodes[nodeidentifier].value
+    def get_node_contigs nodeidentifier
+      if @nodes.key?(nodeidentifier)
+        return @nodes[nodeidentifier].contigs
+      else
+        return nil
+      end
+    end
+
+    def get_node_index nodeidentifier
+      if @nodes.key?(nodeidentifier)
+        return @nodes[nodeidentifier].index
+      else
+        return nil
+      end
+    end
+
+    def get_node_visited nodeidentifier
+      if @nodes.key?(nodeidentifier)
+        return @nodes[nodeidentifier].visit_count
+      else
+        return nil
+      end
+    end
+
+    def get_node_count nodeidentifier
+      @nodes[nodeidentifier].max_count
     end
 
     # Set with value of node at +:nodeidentifier+ to +:value+
-    def set_node_value(value, nodeidentifier)
-      @nodes[nodeidentifier].value = value
+    def set_node_contigs(nodeidentifier, contigs)
+      if @nodes.key?(nodeidentifier)
+        @nodes[nodeidentifier].contigs = contigs
+        return true
+      else
+        return false
+      end
     end
 
-    def add_node_value(value, nodeidentifier)
-      if @nodes[nodeidentifier].value.is_a?(Array)
-        @nodes[nodeidentifier].value << value
+    def add_node_contig(id, nodeidentifier)
+      if @nodes[nodeidentifier].contigs.is_a?(Array)
+        @nodes[nodeidentifier].contigs << id
         # puts "adding #{value} to #{nodeidentifier}"
       else
         raise RuntimeError.new "can't add value to non Array"
@@ -122,11 +182,48 @@ module Clustemble
       degrees.keys
     end
 
-    def first_node_with id
-      first = nil
-      @nodes.each do |node_id, list|
+    def first_node_from_set set
 
-        list.value.each do |contig_id|
+      first = nil
+      @nodes.each do |node_id, node|
+        # puts "#{node_id}\t#{node.contigs.join(",")}"
+        node.contigs.each do |contig_id, index|
+          # puts "set:#{set.to_a.join(",")}\tcontig: #{contig_id}"
+          if set.include?(contig_id) and first.nil?
+            first = node_id
+          end
+        end
+      end
+      # then check if there are any edges that go from a node to this node
+      # and the from node has `id` on it
+
+      # using back edges trace from this node backwards
+      abort "shit" if first.nil?
+      found = true
+      while found
+        found = false
+        previous = @back_edges[first]
+        previous ||= []
+        if previous.size > 0
+          previous.each do |n|
+            # if @nodes[n].contigs.include?(id)
+            if (set & @nodes[n].contigs.keys).size > 0
+              first = n
+              found = true
+            end
+          end
+        end
+      end
+
+      return first
+    end
+
+    def first_node_with id
+      # puts "first node with id = #{id}"
+      first = nil
+      @nodes.each do |node_id, node|
+        # puts "#{node_id}\t#{node.join(",")}"
+        node.contigs.each do |contig_id,index|
           if contig_id==id and first.nil?
             first = node_id
           end
@@ -136,19 +233,23 @@ module Clustemble
       # and the from node has `id` on it
 
       # using back edges trace from this node backwards
-
+      abort "shit" if first.nil?
       found = true
       while found
+        # puts "looping: #{first}"
         found = false
         previous = @back_edges[first]
+        # puts "there are #{previous.length} previous nodes"
         if previous.size == 1
-          if @nodes[previous[0]].value.include?(id)
+          # print previous
+          # p @nodes[previous[0]]
+          if @nodes[previous[0]].contigs.keys.include?(id)
             first = previous[0]
             found = true
           end
         else
           previous.each do |n|
-            if @nodes[n].value.include?(id)
+            if @nodes[n].contigs.keys.include?(id)
               first = n
               found = true
             end
@@ -181,7 +282,7 @@ module Clustemble
     def to_s
       s = ""
       @nodes.each do |identifier, node|
-        s += "#{identifier} (#{node.value}) => #{@edges[identifier]} \n"
+        s += "#{identifier} (#{node.contigs.join(",")}) => #{@edges[identifier]} \n"
       end
       s
     end
