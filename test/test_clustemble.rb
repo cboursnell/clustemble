@@ -34,11 +34,11 @@ class TestClustemble < Test::Unit::TestCase
     #   assert_equal 14, @clust.graph.num_edges
     # end
 
-    # # should "add fasta file" do
-    # #   file = File.join(File.dirname(__FILE__), 'data', 'test.fa')
-    # #   @clust.add_fasta file
-    # #   assert_equal 937, @clust.graph.size
-    # # end
+    # should "add fasta file" do
+    #   file = File.join(File.dirname(__FILE__), 'data', 'test.fa')
+    #   @clust.add_fasta file
+    #   assert_equal 937, @clust.graph.size
+    # end
 
     # should "find sequence is redundant" do
     #   seq1 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
@@ -46,12 +46,26 @@ class TestClustemble < Test::Unit::TestCase
     #   @clust.add_seq 0, seq1
     #   @clust.add_seq 1, seq2
     #   assert_equal 15, @clust.graph.size
-    #   # @clust.extract_seqs
+    #   p @clust.extract_seqs
     # end
 
     should "deal with the same kmer appearing twice in a sequence" do
-      list = @clust.kmerise "TTGGAATCGGTGACCGGCATGAATTTGACAGATTGGAATCGGTGACCGGCATGAATTTGACAG"
-      assert_equal nil, list
+      seq1 = "TTGGAATCGGTGACCGGCATGAATTTGACAGATT"
+      seq2 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTGGAATCGGTGACCGGCATGAATTTGACAGTA"
+      list = @clust.kmerise seq2
+      # assert_equal 35, list.size, "list size"
+      hash={}
+      list.each do |i|
+        hash[i]||=0
+        hash[i] += 1
+      end
+      # assert_equal 34, hash.size, "hash size"
+      puts "TEST: adding sequences"
+      @clust.add_seq 0, seq1
+      @clust.add_seq 1, seq2
+      seqs = @clust.extract_seqs
+      p seqs
+      assert_equal seq2.length, seqs[1].length
     end
 
     # should "combine overlapping sequences" do

@@ -6,10 +6,10 @@ module Clustemble
 
   class Node
 
-    attr_accessor :max_count, :visit_count, :contigs
+    attr_accessor :max_count, :visit_count, :contigs, :visit_count
 
     def initialize contig, index
-      @index = index
+      # @index = index
       # @max_count = 1   # i think that count might have to be specific to each
       @visit_count = 0 # contig.
       @contigs = Hash.new
@@ -103,6 +103,14 @@ module Clustemble
       @nodes[nodeidentifier].max_count
     end
 
+    def inc_node_visited nodeidentifier
+      @nodes[nodeidentifier].visit_count += 1
+    end
+
+    def reset_node_visited nodeidentifier
+      @nodes[nodeidentifier].visit_count = 0
+    end
+
     # Set with value of node at +:nodeidentifier+ to +:value+
     def set_node_contigs(nodeidentifier, contigs)
       if @nodes.key?(nodeidentifier)
@@ -183,7 +191,11 @@ module Clustemble
     end
 
     def first_node_from_set set
-
+      if !set.is_a?(Set)
+        tmpset = Set.new
+        tmpset << set
+        set = tmpset
+      end
       first = nil
       @nodes.each do |node_id, node|
         # puts "#{node_id}\t#{node.contigs.join(",")}"
@@ -199,17 +211,30 @@ module Clustemble
 
       # using back edges trace from this node backwards
       abort "shit" if first.nil?
+      puts "earliest node found so far is #{first}"
       found = true
       while found
         found = false
         previous = @back_edges[first]
+        print "before #{first}. previous: "
+        p previous
+        node_index = @nodes[first].contigs
+        puts "node index of #{first} = "
+        p node_index
         previous ||= []
         if previous.size > 0
-          previous.each do |n|
-            # if @nodes[n].contigs.include?(id)
-            if (set & @nodes[n].contigs.keys).size > 0
-              first = n
-              found = true
+          previous.each_with_index do |n,i|
+            puts "  #{(set & @nodes[n].contigs.keys).to_a}"
+            puts "  #{@nodes[n].contigs}"
+            subset = set & @nodes[n].contigs.keys
+            if subset.size > 0
+              subset.each do |s|
+                if @nodes[n].contigs[s] < node_index[s]
+                  puts "#{@nodes[n].contigs[s]} < #{node_index[s]}"
+                  first = n
+                  found = true
+                end
+              end
             end
           end
         end
