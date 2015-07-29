@@ -13,6 +13,15 @@ class TestAdjacencyList < Test::Unit::TestCase
     teardown do
     end
 
+    should "create a node" do
+      node = Clustemble::Node.new("ACGT")
+      node.add_contig(1, 0)
+      assert node.has_contig?(1), "has contig"
+      assert_equal [0], node.indices(1), "node indices"
+      node.add_contig(1, 33)
+      assert_equal [0,33], node.indices(1), "node indices2"
+    end
+
     should "add a node" do
       @graph.add("ACGT", 1, 0)
       assert_equal 1, @graph.size
@@ -88,19 +97,99 @@ class TestAdjacencyList < Test::Unit::TestCase
       assert_equal 1, @graph.edges[node1].size
     end
 
-    # should "get first node with specific id" do
-    #   node1 = "CGTT"
-    #   node2 = "ACGT"
-    #   node3 = "AACG"
-    #   node4 = "AACG"
-    #   @graph.add(Clustemble::Node.new(0, 1, [1]), node1)
-    #   @graph.add(Clustemble::Node.new(1, 1, [1]), node2)
-    #   @graph.add(Clustemble::Node.new(2, 1, [1]), node3)
-    #   @graph.add(Clustemble::Node.new(0, 1, [2]), node4)
-    #   @graph.add_edge(node3, node2)
-    #   @graph.add_edge(node2, node1)
-    #   assert_equal node3, @graph.first_node_with(1), "first node"
-    # end
+    should "get first node with specific id" do
+      # seq = AACGTT
+
+      seq1 = "AACGTT"
+      k_size = 4
+      [seq1].each_with_index do |seq, id|
+        kmers = []
+        (0..seq.length-k_size).each do |i|
+          kmer = (seq[i..(i+k_size-1)]).upcase
+          kmers << kmer
+        end
+        kmers.each_with_index do |kmer, index|
+          @graph.add(kmer, id, index)
+          @graph.add_edge(kmers[index-1], kmer) if index > 0
+        end
+      end
+
+      assert_equal "AACG", @graph.first_node(0), "first node"
+    end
+
+    should "get the first node in a more complex sequence" do
+      seq1 = "TTGGAATCGGTGACCGGCATGAATTTGACAGATT"
+      seq2 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTGGAATCGGTGACCGGCATGAATTTGACAGTA"
+      k_size = 31
+      [seq1, seq2].each_with_index do |seq, id|
+        kmers = []
+        (0..seq.length-k_size).each do |i|
+          kmer = (seq[i..(i+k_size-1)]).upcase
+          kmers << kmer
+        end
+        kmers.each_with_index do |kmer, index|
+          @graph.add(kmer, id, index)
+          @graph.add_edge(kmers[index-1], kmer) if index > 0
+        end
+      end
+
+      start = @graph.first_node 1
+      assert_equal "AATTGGAATCGGTGACCGGCATGAATTTGAC", start
+
+    end
+
+    should "get the first node in a very simple sequence!" do
+      seq1 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+      seq2 = seq1[4..41]
+
+      k_size = 31
+      [seq1, seq2].each_with_index do |seq, id|
+        kmers = []
+        (0..seq.length-k_size).each do |i|
+          kmer = (seq[i..(i+k_size-1)]).upcase
+          kmers << kmer
+        end
+        kmers.each_with_index do |kmer, index|
+          @graph.add(kmer, id, index)
+          @graph.add_edge(kmers[index-1], kmer) if index > 0
+        end
+      end
+      set = Set.new
+      set << 0
+      set << 1
+      start = @graph.first_node set
+
+      assert_equal "TTGGAATCGGTGACCGGCATGAATTTGACAG", start
+
+    end
+
+    should "make one sequence out of three that overlap" do
+      seq1 = "TAGCGGCCACTGAAAACTAGAATTTCCACCAAAGTTCACGAAGAGCGCGCGACTCATTCACCGCGAAGACTCACTTCGGTTTAGCGGA"
+      seq2 = "TCACCGCGAAGACTCACTTCGGTTTAGCGGATGTTCACACCAATTAATGCTGCGTCCTATTGGTTTCTAGCCCATACGGCGCATACATACATACGGT"
+      seq3 = "TTGGTTTCTAGCCCATACGGCGCATACATACATACGGTCCGGGATTCCATCCCACGATAGAAGGAGTCCGGAGTGCTCTATCTA"
+
+      k_size = 31
+      [seq1, seq2, seq3].each_with_index do |seq, id|
+        kmers = []
+        (0..seq.length-k_size).each do |i|
+          kmer = (seq[i..(i+k_size-1)]).upcase
+          kmers << kmer
+        end
+        kmers.each_with_index do |kmer, index|
+          @graph.add(kmer, id, index)
+          @graph.add_edge(kmers[index-1], kmer) if index > 0
+        end
+      end
+      set = Set.new
+      # set << 0
+      set << 1
+      set << 2
+      start = @graph.first_node set
+
+      assert_equal "TAGCGGCCACTGAAAACTAGAATTTCCACCA", start
+
+    end
+
 
   end
 

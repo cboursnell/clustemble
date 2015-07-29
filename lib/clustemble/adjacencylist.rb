@@ -6,25 +6,70 @@ module Clustemble
 
   class Node
 
-    attr_accessor :max_count, :visit_count, :contigs, :visit_count
+    attr_accessor :kmer, :contigs
 
-    def initialize contig, index
-      # @index = index
-      # @max_count = 1   # i think that count might have to be specific to each
-      @visit_count = 0 # contig.
-      @contigs = Hash.new
-      @contigs[contig] = index
+    def initialize kmer
+      @kmer = kmer
+      @contigs = []
     end
 
     def add_contig(contig, index)
-      if @contigs.key?(contig)
-      else
-        @contigs[contig] = index
-        # @max_count += 1
-      end
+      @contigs <<  { :contig => contig, :index => index, :visit => false }
     end
 
-  end
+    def has_contig? contig
+      found = false
+      @contigs.each do |h|
+        if h[:contig]==contig
+          found = true
+        end
+      end
+      return found
+    end
+
+    def has_contigs? set
+      found = false
+      @contigs.each do |h|
+        if set.include?(h[:contig])
+          found = true
+        end
+      end
+      return found
+    end
+
+    def indices contig
+      list = []
+      @contigs.each do |h|
+        if h[:contig]==contig
+          list << h[:index]
+        end
+      end
+      return list
+    end
+
+    def visited? contig, index
+      v = false
+      @contigs.each do |c|
+        if c[:contig]==contig and c[:index]==index
+          v = c[:visit]
+        end
+      end
+      return v
+    end
+
+    def set_visited contig, index, bool
+      set = false
+      @contigs.each do |c|
+        if c[:contig]==contig and c[:index]==index
+          # puts "+ visible set on #{contig}\t#{index}\t#{@kmer}"
+          c[:visit] = bool
+          set = true
+        end
+      end
+      return set
+    end
+
+  end # class Node
 
   class AdjacencyList
 
@@ -37,13 +82,15 @@ module Clustemble
       @back_edges = {}
     end
 
-    def add(nodeidentifier, contig, index)
-      if @nodes.key?(nodeidentifier)
-        @nodes[nodeidentifier].add_contig(contig, index)
+    def add(kmer, contig, index)
+      if @nodes.key?(kmer)
+        @nodes[kmer].add_contig(contig, index)
       else
-        @nodes[nodeidentifier] = Node.new(contig, index)
-        @edges[nodeidentifier] = []
-        @back_edges[nodeidentifier] = []
+        node = Node.new(kmer)
+        node.add_contig(contig, index)
+        @nodes[kmer] = node
+        @edges[kmer] = []
+        @back_edges[kmer] = []
       end
     end
 
@@ -91,42 +138,29 @@ module Clustemble
       end
     end
 
-    def get_node_visited nodeidentifier
-      if @nodes.key?(nodeidentifier)
-        return @nodes[nodeidentifier].visit_count
+    def visited? kmer, contig, index
+      if @nodes.key?(kmer)
+        return @nodes[kmer].visited?(contig, index)
       else
         return nil
       end
     end
 
-    def get_node_count nodeidentifier
-      @nodes[nodeidentifier].max_count
-    end
-
-    def inc_node_visited nodeidentifier
-      @nodes[nodeidentifier].visit_count += 1
-    end
-
-    def reset_node_visited nodeidentifier
-      @nodes[nodeidentifier].visit_count = 0
+    def set_visited kmer, contig, index, bool
+      found=false
+      if @nodes.key?(kmer)
+        found = @nodes[kmer].set_visited contig, index, bool
+      end
+      return found
     end
 
     # Set with value of node at +:nodeidentifier+ to +:value+
-    def set_node_contigs(nodeidentifier, contigs)
-      if @nodes.key?(nodeidentifier)
-        @nodes[nodeidentifier].contigs = contigs
+    def add_node_contig(kmer, id, index)
+      if @nodes.key?(kmer)
+        @nodes[kmer].add_contig(id, index)
         return true
       else
         return false
-      end
-    end
-
-    def add_node_contig(id, nodeidentifier)
-      if @nodes[nodeidentifier].contigs.is_a?(Array)
-        @nodes[nodeidentifier].contigs << id
-        # puts "adding #{value} to #{nodeidentifier}"
-      else
-        raise RuntimeError.new "can't add value to non Array"
       end
     end
 
@@ -190,98 +224,163 @@ module Clustemble
       degrees.keys
     end
 
-    def first_node_from_set set
+    def first_node_old set
+      # if set is an integer then make it a set
       if !set.is_a?(Set)
         tmpset = Set.new
         tmpset << set
         set = tmpset
       end
-      first = nil
-      @nodes.each do |node_id, node|
-        # puts "#{node_id}\t#{node.contigs.join(",")}"
-        node.contigs.each do |contig_id, index|
-          # puts "set:#{set.to_a.join(",")}\tcontig: #{contig_id}"
-          if set.include?(contig_id) and first.nil?
-            first = node_id
-          end
+      first = ""
+      # scan through the nodes and just get the first node it finds
+      # p set.to_a
+      @nodes.each do |kmer, node|
+        if node.has_contigs?(set)
+          first = kmer
+          break
         end
       end
-      # then check if there are any edges that go from a node to this node
-      # and the from node has `id` on it
-
-      # using back edges trace from this node backwards
-      abort "shit" if first.nil?
-      puts "earliest node found so far is #{first}"
-      found = true
-      while found
-        found = false
+      # puts "first: #{first}"
+      if first==""
+        abort "error type 234"
+      end
+      # now from this kmer work backwards to find the first kmer
+      if @back_edges.key?(first)
         previous = @back_edges[first]
-        print "before #{first}. previous: "
-        p previous
-        node_index = @nodes[first].contigs
-        puts "node index of #{first} = "
-        p node_index
-        previous ||= []
-        if previous.size > 0
-          previous.each_with_index do |n,i|
-            puts "  #{(set & @nodes[n].contigs.keys).to_a}"
-            puts "  #{@nodes[n].contigs}"
-            subset = set & @nodes[n].contigs.keys
-            if subset.size > 0
-              subset.each do |s|
-                if @nodes[n].contigs[s] < node_index[s]
-                  puts "#{@nodes[n].contigs[s]} < #{node_index[s]}"
-                  first = n
-                  found = true
+        # print "previous: "
+        # p previous
+        count=0
+        while previous.size > 0
+          contigs = @nodes[first].contigs
+          print "contig info: "
+          p contigs
+          if previous.size == 1
+            print "info on only previous node:  "
+            p previous[0]
+            p @nodes[previous[0]].contigs
+            if @nodes[previous[0]].has_contigs? set
+              first = previous[0]
+              previous = @back_edges[first]
+              # puts "setting first to #{first}"
+              # puts "previous size #{previous.size}"
+            else
+              @nodes[previous[0]].contigs.each do |hash|
+                set << hash[:contig]
+                puts "adding #{hash[:contig]} to set"
+              end
+              previous = @back_edges[first]
+              puts "set is now: #{set.to_a}"
+            end
+          else
+            puts "looking through #{previous.size} previous nodes"
+            list = []
+            previous.each do |prev|
+              if @nodes[prev].has_contigs?(set)
+                list << prev
+              end
+            end
+            puts "made a list of size #{list.size}"
+            current = 1e6
+            contigs.each do |item|
+              print "item1:"
+              p item
+              i = item[:index]
+              if i < current
+                current = i
+              end
+            end
+            next_kmer = ""
+            puts "set index to #{current}"
+            list.each do |kmer|
+              @nodes[kmer].contigs.each do |item|
+                i = item[:index]
+                print "item:"
+                p item
+                if i == current - 1
+                  puts "found a kmer that's before"
+                  next_kmer = kmer
                 end
               end
             end
+            if next_kmer == ""
+              next_kmer = list.shuffle.first
+              puts "picking a random one... this will work right?"
+            end
+            first = next_kmer
+            previous = @back_edges[first]
           end
-        end
+          count+=1
+          abort "too many times" if count>300
+        end # while
       end
-
       return first
     end
 
-    def first_node_with id
-      # puts "first node with id = #{id}"
-      first = nil
-      @nodes.each do |node_id, node|
-        # puts "#{node_id}\t#{node.join(",")}"
-        node.contigs.each do |contig_id,index|
-          if contig_id==id and first.nil?
-            first = node_id
-          end
+    def first_node set
+      # if set is an integer then make it a set
+      if !set.is_a?(Set)
+        tmpset = Set.new
+        tmpset << set
+        set = tmpset
+      end
+      first = ""
+      # scan through the nodes and just get the first node it finds
+      # p set.to_a
+      @nodes.each do |kmer, node|
+        if node.has_contigs?(set)
+          first = kmer
+          break
         end
       end
-      # then check if there are any edges that go from a node to this node
-      # and the from node has `id` on it
-
-      # using back edges trace from this node backwards
-      abort "shit" if first.nil?
-      found = true
-      while found
-        # puts "looping: #{first}"
-        found = false
-        previous = @back_edges[first]
-        # puts "there are #{previous.length} previous nodes"
-        if previous.size == 1
-          # print previous
-          # p @nodes[previous[0]]
-          if @nodes[previous[0]].contigs.keys.include?(id)
-            first = previous[0]
-            found = true
+      # puts "first: #{first}"
+      if first==""
+        abort "error type 234"
+      end
+      # count=0
+      # now from this kmer work backwards to find the first kmer
+      while @back_edges[first].size > 0
+        info = @nodes[first].contigs
+        index = 1e6
+        current = -1
+        info.each do |hash|
+          if hash[:index] < index
+            index = hash[:index]
+            current = hash[:contig]
           end
-        else
-          previous.each do |n|
-            if @nodes[n].contigs.keys.include?(id)
-              first = n
-              found = true
+        end
+        # puts "first: #{first}"
+        previous = @back_edges[first]
+        if previous.size == 1
+          first = previous[0]
+          # puts "setting first to #{first} 1"
+        elsif previous.size >= 2
+          candidates = []
+          # print "previous: "
+          # p previous
+          previous.each do |prev|
+            contigs = @nodes[prev].contigs
+            contigs.each do |item|
+              c = item[:contig]
+              i = item[:index]
+              if c == current and index - 1 == i
+                candidates << {:kmer=>prev,:contig=>c,:index=>i,:score=>0}
+              else
+                candidates << {:kmer=>prev,:contig=>c,:index=>i,:score=>1}
+              end
             end
           end
+          # print "candidates: "
+          # p candidates
+          res = candidates.sort_by! { |x| [ x[:score], x[:index] ] }
+          first = res.first[:kmer]
+          # puts "setting first to #{first} 2"
+        else
+          puts "first: #{first}"
+          abort "this shouldn't happen"
         end
+        # count+=1
+        # abort "schtop!" if count > 100
       end
-
       return first
     end
 
