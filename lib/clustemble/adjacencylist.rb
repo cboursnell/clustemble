@@ -37,6 +37,20 @@ module Clustemble
       return found
     end
 
+    def has_all_contigs? array
+      set=Set.new
+      @contigs.each do |h|
+        if array.include?(h[:contig])
+          set << h[:contig]
+        end
+      end
+      if set.to_a.sort == array.sort
+        return true
+      else
+        return false
+      end
+    end
+
     def indices contig
       list = []
       @contigs.each do |h|
@@ -67,6 +81,26 @@ module Clustemble
         end
       end
       return set
+    end
+
+    def remove contig
+      @contigs.delete_if {|x| x[:contig]==contig}
+    end
+
+    def rename contig1, contig2
+      @contigs.each do |hash|
+        if hash[:contig]==contig1
+          hash[:contig]=contig2
+        end
+      end
+    end
+
+    def add_to_index id, diff
+      @contigs.each do |hash|
+        if hash[:contig]==id
+          hash[:index] += diff
+        end
+      end
     end
 
   end # class Node

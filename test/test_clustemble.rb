@@ -13,19 +13,32 @@ class TestClustemble < Test::Unit::TestCase
     teardown do
     end
 
-    # should "kmerise sequence" do
-    #   list = @clust.kmerise "TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
-    #   assert_equal 15, list.size, "list length"
-    #   assert_equal 31, list[0].length, "kmer length"
-    # end
+    should "kmerise sequence" do
+      list = @clust.kmerise 0, "TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+      assert_equal 16, list.size, "list length"
+      assert_equal 31, list[0].length, "kmer length"
+    end
 
-    # should "kmerise sequence with lower case characters" do
-    #   list1 = @clust.kmerise "TTGGAATCGGTGACCGGcATGAATTTGACAGAACTCGAGGCGATT"
-    #   list2 = @clust.kmerise "TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
-    #   assert_equal 15, list1.size
-    #   assert_equal 31, list1[0].length
-    #   assert list1==list2
-    # end
+    should "kmerise sequence with lower case characters" do
+      list1 = @clust.kmerise 0, "TTGGAATCGGTGACCGGcATGAATTTGACAGAACTCGAGGCGATT"
+      list2 = @clust.kmerise 1, "TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+      assert_equal 16, list1.size, "list size"
+      assert_equal 31, list1[0].length, "list 0 size"
+      # assert list1==list2, "lists are equal"
+      (0..14).each do |i|
+        assert_equal list1[i], list2[i], "list[#{i}] are equal"
+      end
+    end
+
+    should "add kmers to graph" do
+      seq1 = "TTGGAATCGGTGACCGGCATGAATTTGACAGATT"
+      seq2 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTGGAATCGGTGACCGGCATGAATTTGACAGTA"
+      set1,kmer1 = @clust.add_kmers 0, seq1
+      set2,kmer2 = @clust.add_kmers 1, seq2
+      assert_equal [0], set1.to_a, "contigs in set"
+      assert_equal [1,0], set2.to_a, "contigs in set"
+      assert_equal 5, kmer1.size, "number of kmers"
+    end
 
     # should "add sequence" do
     #   @clust.add_seq 0, "TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
@@ -40,34 +53,46 @@ class TestClustemble < Test::Unit::TestCase
     #   assert_equal 937, @clust.graph.size
     # end
 
-    # should "find sequence is redundant" do
-    #   seq1 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
-    #   seq2 = seq1[4..41]
-    #   # puts "ADDING 0: #{seq1}"
-    #   @clust.add_seq 0, seq1
-    #   # puts "ADDING 1: #{seq2}"
-    #   @clust.add_seq 1, seq2
-    #   assert_equal 17, @clust.graph.size
-    #   assert_equal seq1, @clust.extract_seqs[100]
-    # end
+    should "find sequence is redundant" do
+      seq1 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+      seq2 = seq1[4..41]
+      @clust.add_seq 0, seq1
+      @clust.add_seq 1, seq2
+      assert_equal 17, @clust.graph.size
+      seqs = @clust.extract_seqs
+      assert_equal seq1, seqs[0], "sequence"
+    end
 
-    # should "deal with the same kmer appearing twice in a sequence" do
-    #   seq1 = "TTGGAATCGGTGACCGGCATGAATTTGACAGATT"
-    #   seq2 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTGGAATCGGTGACCGGCATGAATTTGACAGTA"
-    #   list = @clust.kmerise 0, seq2
-    #   assert_equal 38, list.size, "list size"
-    #   hash={}
-    #   list.each do |i|
-    #     hash[i]||=0
-    #     hash[i] += 1
-    #   end
-    #   assert_equal 36, hash.size, "hash size"
-    #   @clust.add_seq 0, seq1
-    #   @clust.add_seq 1, seq2
-    #   seqs = @clust.extract_seqs
-    #   assert seqs.size > 0, "seq hash size"
-    #   assert_equal seq2, seqs.to_a.first.last, "seq2"
-    # end
+    should "find sequence is different transcript" do
+      seq1 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTGGAATCGGTGACCGGCATGAATTTGACAGTA"
+      seq2 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTTGGAATCGGTGACCGGCATGAATTTGACAGTA"
+      seq3 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTG"
+      @clust.add_seq 0, seq1
+      @clust.add_seq 1, seq2
+      @clust.add_seq 2, seq3
+      seqs = @clust.extract_seqs
+      assert_equal 2, seqs.size
+      assert_equal seq1, seqs[0], "sequence 1"
+      assert_equal seq2, seqs[1], "sequence 2"
+    end
+
+    should "deal with the same kmer appearing twice in a sequence" do
+      seq1 = "TTGGAATCGGTGACCGGCATGAATTTGACAGATT"
+      seq2 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTGGAATCGGTGACCGGCATGAATTTGACAGTA"
+      list = @clust.kmerise 0, seq2
+      assert_equal 38, list.size, "list size"
+      hash={}
+      list.each do |i|
+        hash[i]||=0
+        hash[i] += 1
+      end
+      assert_equal 36, hash.size, "hash size"
+      @clust.add_seq 0, seq1
+      @clust.add_seq 1, seq2
+      seqs = @clust.extract_seqs
+      assert seqs.size > 0, "seq hash size"
+      assert_equal seq2, seqs.to_a.first.last, "seq2"
+    end
 
     # should "deal with some kmers appearing multiple times" do
     #   seq1 = "GGCGCCATACCCATCTTACGTAATGTCAATAAAAACATGG"
@@ -96,6 +121,32 @@ class TestClustemble < Test::Unit::TestCase
     #   assert_equal res, seqs.to_a.first.last, "seq"
     # end
 
+    # should "rename the kmers in the graph from one contig to another" do
+    #   seq1 = "TAGCGGCCACTGAAAACTAGAATTTCCACCAAAGTTCACGAAGAGCGCGCGACTCATTCAC"
+    #   seq2 = "ACCAAAGTTCACGAAGAGCGCGCGACTCATTCACCGCGAAGACTCACTTCGGTTTAGCGGA"
+    #   @clust.add_seq 0, seq1
+    #   @clust.add_seq 1, seq2
+    #   @clust.rename 0, 1 # rename contig id 0 to contig id 1
+    #   assert 1==0, "rename"
+    # end
+
+    # should "join two sequences together with a third sequence" do
+
+    #   seq1 = "TAGCGGCCACTGAAAACTAGAATTTCCACCAAAGTTCACGAAGAGCGCGCGACTCATTCACCGCGAAGACTCACTTCGGTTTAGCGGA"
+    #   seq2 = "TTGGTTTCTAGCCCATACGGCGCATACATACATACGGTCCGGGATTCCATCCCACGATAGAAGGAGTCCGGAGTGCTCTATCTA"
+    #   seq3 = "TCACCGCGAAGACTCACTTCGGTTTAGCGGATGTTCACACCAATTAATGCTGCGTCCTATTGGTTTCTAGCCCATACGGCGCATACATACATACGGT"
+
+    #   @clust.add_seq 1, seq1
+    #   @clust.add_seq 2, seq2
+    #   @clust.add_seq 3, seq3
+    #   # seqs = @clust.extract_seqs
+    #   ans = "TAGCGGCCACTGAAAACTAGAATTTCCACCAAAGTTCACGAAGAGCGCGCGACTCATTCACCGC"
+    #   ans << "GAAGACTCACTTCGGTTTAGCGGATGTTCACACCAATTAATGCTGCGTCCTATTGGTTTCTAG"
+    #   ans << "CCCATACGGCGCATACATACATACGGTCCGGGATTCCATCCCACGATAGAAGGAGTCCGGAGT"
+    #   ans << "GCTCTATCTA"
+    #   # assert_equal ans, seqs.to_a.first.last, "seq"
+    # end
+
     # should "make one sequence out of three that overlap" do
     #   seq1 = "TAGCGGCCACTGAAAACTAGAATTTCCACCAAAGTTCACGAAGAGCGCGCGACTCATTCACCGCGAAGACTCACTTCGGTTTAGCGGA"
     #   seq2 = "TCACCGCGAAGACTCACTTCGGTTTAGCGGATGTTCACACCAATTAATGCTGCGTCCTATTGGTTTCTAGCCCATACGGCGCATACATACATACGGT"
@@ -103,30 +154,30 @@ class TestClustemble < Test::Unit::TestCase
     #   @clust.add_seq 1, seq1
     #   @clust.add_seq 2, seq2
     #   @clust.add_seq 3, seq3
-    #   seqs = @clust.extract_seqs
+    #   # seqs = @clust.extract_seqs
     #   ans = "TAGCGGCCACTGAAAACTAGAATTTCCACCAAAGTTCACGAAGAGCGCGCGACTCATTCACCGC"
     #   ans << "GAAGACTCACTTCGGTTTAGCGGATGTTCACACCAATTAATGCTGCGTCCTATTGGTTTCTAG"
     #   ans << "CCCATACGGCGCATACATACATACGGTCCGGGATTCCATCCCACGATAGAAGGAGTCCGGAGT"
     #   ans << "GCTCTATCTA"
-    #   assert_equal ans, seqs.to_a.first.last, "seq"
+    #   # assert_equal ans, seqs.to_a.first.last, "seq"
     # end
 
-    # should "combine overlapping sequences" do
-    #   # ********----
-    #   # ----********
-    #   #             v-----------------seq1----------------v
-    #   seq0 = "TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
-    #   #       ^--------------seq2-------------------^
-    #   seq1 ="TCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
-    #   seq2 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAG"
-    #   @clust.add_seq 1, seq1
-    #   @clust.add_seq 2, seq2
-    #   assert_equal 17, @clust.graph.size
-    #   seqs = @clust.extract_seqs
-    #   assert_equal seq0, seqs.to_a.first.last, "sequence"
-    #   # assert_equal 1, seqs.keys.first
-    #   # assert_equal seq0, seqs.values.first
-    # end
+    should "combine overlapping sequences" do
+      # ********----
+      # ----********
+      #             v-----------------seq1----------------v
+      seq0 = "TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+      #       ^--------------seq2-------------------^
+      seq1 ="TCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+      seq2 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAG"
+      @clust.add_seq 0, seq1
+      @clust.add_seq 1, seq2
+      assert_equal 17, @clust.graph.size
+      seqs = @clust.extract_seqs
+      assert_equal seq0, seqs.to_a.first.last, "sequence"
+      assert_equal 1, seqs.keys.first
+      assert_equal seq0, seqs.values.first
+    end
 
     # should "combine three overlapping sequences " do
     #   seq3 = "CACAAAACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTATAAGCAAATGGCAAA"
@@ -146,35 +197,35 @@ class TestClustemble < Test::Unit::TestCase
     #   assert_equal seq3, result.to_a.first.last
     # end
 
-    should "return two sequences" do
-      seq1 =  "CACAAAACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTA"
-      seq1 << "TAAGCAAATGGCAAA"
-      seq1 << "CTATATTTATCATCAAATGTCAAGATGCATCTAAT"
-      seq2 =  "CACAAAACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTA"
-      seq2 << "CTATATTTATCATCAAATGTCAAGATGCATCTAAT"
-      seq3 =       "AACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTA"
-      seq3 << "TAAGCA"
+    # should "return two sequences" do
+    #   seq1 =  "CACAAAACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTA"
+    #   seq1 << "TAAGCAAATGGCAAA"
+    #   seq1 << "CTATATTTATCATCAAATGTCAAGATGCATCTAAT"
+    #   seq2 =  "CACAAAACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTA"
+    #   seq2 << "CTATATTTATCATCAAATGTCAAGATGCATCTAAT"
+    #   seq3 =       "AACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTA"
+    #   seq3 << "TAAGCA"
 
-      # 3 ----***************************-----------------------------
-      # 1 ************************************************************
-      # 2 ****************************----------**********************
+    #   # 3 ----***************************-----------------------------
+    #   # 1 ************************************************************
+    #   # 2 ****************************----------**********************
 
-      # puts "TEST: adding contig id 1"
-      @clust.add_seq 0, seq1
-      assert_equal 67, @clust.graph.size, "graph size after adding seq1"
-      # puts "TEST: adding contig id 2"
-      @clust.add_seq 1, seq2
-      assert_equal 97, @clust.graph.size, "graph size after adding seq2"
-      assert_equal 2, @clust.extract_seqs.size, "extracted seq size"
+    #   # puts "TEST: adding contig id 1"
+    #   @clust.add_seq 0, seq1
+    #   assert_equal 67, @clust.graph.size, "graph size after adding seq1"
+    #   # puts "TEST: adding contig id 2"
+    #   @clust.add_seq 1, seq2
+    #   assert_equal 97, @clust.graph.size, "graph size after adding seq2"
+    #   assert_equal 2, @clust.extract_seqs.size, "extracted seq size"
 
-      # puts "TEST: adding contig id 3"
-      @clust.add_seq 2, seq3
-      seqs = @clust.extract_seqs
-      p seqs
-      assert_equal 2, seqs.size
-      assert_equal seq1, seqs.to_a[0].last, "seq1"
-      assert_equal seq2, seqs.to_a[1].last, "seq2"
-    end
+    #   # puts "TEST: adding contig id 3"
+    #   @clust.add_seq 2, seq3
+    #   seqs = @clust.extract_seqs
+    #   p seqs
+    #   assert_equal 2, seqs.size
+    #   assert_equal seq1, seqs.to_a[0].last, "seq1"
+    #   assert_equal seq2, seqs.to_a[1].last, "seq2"
+    # end
 
     # should "run on an actual fasta file" do
     #   file = File.join(File.dirname(__FILE__), 'data', 'cluster.fa')

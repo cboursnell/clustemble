@@ -190,6 +190,44 @@ class TestAdjacencyList < Test::Unit::TestCase
 
     end
 
+    should "check that node has contigs" do
+      node = Clustemble::Node.new "ACGT"
+      node.add_contig(1,1)
+      node.add_contig(2,1)
+      node.add_contig(3,1)
+      assert_equal true, node.has_all_contigs?([1,2,3])
+      assert_equal true, node.has_all_contigs?([1,2])
+      assert_equal false, node.has_all_contigs?([1,2,4])
+    end
+
+    should "remove contig info" do
+      node = Clustemble::Node.new "ACGT"
+      node.add_contig(1,2)
+      node.add_contig(2,5)
+      node.add_contig(3,10)
+      assert_equal true, node.has_all_contigs?([1,2,3])
+      node.remove 3
+      assert_equal false, node.has_all_contigs?([1,2,3])
+      assert_equal true, node.has_all_contigs?([1,2])
+    end
+
+    should "rename contig on node" do
+      node = Clustemble::Node.new "ACGT"
+      node.add_contig(1,2)
+      node.rename(1,2)
+      assert_equal false, node.has_contig?(1)
+      assert_equal true, node.has_contig?(2)
+    end
+
+    should "add to index" do
+      node = Clustemble::Node.new "ACGT"
+      node.add_contig(1,2)
+      node.add_contig(2,3)
+      node.add_to_index(1,2)
+      assert_equal 4, node.contigs[0][:index], "index"
+
+    end
+
 
   end
 
