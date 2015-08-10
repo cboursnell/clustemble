@@ -107,13 +107,14 @@ module Clustemble
 
   class AdjacencyList
 
-    attr_accessor :nodes, :edges
+    attr_accessor :nodes, :edges, :starts
 
     # Returns a new AdjacencyList
     def initialize
       @nodes = {}
       @edges = {}
       @back_edges = {}
+      @starts = {}
     end
 
     def add(kmer, contig, index)
@@ -125,6 +126,10 @@ module Clustemble
         @nodes[kmer] = node
         @edges[kmer] = []
         @back_edges[kmer] = []
+      end
+      if index == 0
+        puts "adding contig #{contig} to starts with #{kmer}"
+        @starts[contig] = kmer
       end
     end
 
@@ -244,19 +249,19 @@ module Clustemble
       degree
     end
 
-    def starts # return nodes with an in degree of 0
-      degrees={}
-      @nodes.each do |k,v|
-        degrees[k]=0
-      end
-      @edges.each do |fromnode, list|
-        list.each do |tonode|
-          degrees[tonode]+=1
-        end
-      end
-      degrees.delete_if {|k,v| v > 0}
-      degrees.keys
-    end
+    # def starts # return nodes with an in degree of 0
+    #   degrees={}
+    #   @nodes.each do |k,v|
+    #     degrees[k]=0
+    #   end
+    #   @edges.each do |fromnode, list|
+    #     list.each do |tonode|
+    #       degrees[tonode]+=1
+    #     end
+    #   end
+    #   degrees.delete_if {|k,v| v > 0}
+    #   degrees.keys
+    # end
 
     def first_node_old set
       # if set is an integer then make it a set

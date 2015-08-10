@@ -33,11 +33,26 @@ class TestClustemble < Test::Unit::TestCase
     should "add kmers to graph" do
       seq1 = "TTGGAATCGGTGACCGGCATGAATTTGACAGATT"
       seq2 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTGGAATCGGTGACCGGCATGAATTTGACAGTA"
-      set1,kmer1 = @clust.add_kmers 0, seq1
-      set2,kmer2 = @clust.add_kmers 1, seq2
-      assert_equal [0], set1.to_a, "contigs in set"
-      assert_equal [1,0], set2.to_a, "contigs in set"
+      kmer1 = @clust.add_kmers 0, seq1
+      kmer2 = @clust.add_kmers 1, seq2
       assert_equal 5, kmer1.size, "number of kmers"
+      assert_equal 38, kmer2.size, "number of kmers2"
+    end
+
+    should "get alignment type for overlapping sequences" do
+      seq1 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+      seq2 = seq1[4..41]
+      kmers1 = @clust.add_kmers 0, seq1
+      kmers2 = @clust.add_kmers 1, seq2
+      assert_equal 1, @clust.align(kmers2, 0, 1), "alignment type"
+    end
+
+    should "get alignment type for overlapping sequences the other way" do
+      seq2 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+      seq1 = seq2[4..41]
+      kmers1 = @clust.add_kmers 0, seq1
+      kmers2 = @clust.add_kmers 1, seq2
+      assert_equal 2, @clust.align(kmers2, 0, 1), "alignment type"
     end
 
     # should "add sequence" do
@@ -53,46 +68,46 @@ class TestClustemble < Test::Unit::TestCase
     #   assert_equal 937, @clust.graph.size
     # end
 
-    should "find sequence is redundant" do
-      seq1 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
-      seq2 = seq1[4..41]
-      @clust.add_seq 0, seq1
-      @clust.add_seq 1, seq2
-      assert_equal 17, @clust.graph.size
-      seqs = @clust.extract_seqs
-      assert_equal seq1, seqs[0], "sequence"
-    end
+    # should "find sequence is redundant" do
+    #   seq1 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+    #   seq2 = seq1[4..41]
+    #   @clust.add_seq 0, seq1
+    #   @clust.add_seq 1, seq2
+    #   assert_equal 17, @clust.graph.size
+    #   seqs = @clust.extract_seqs
+    #   assert_equal seq1, seqs[0], "sequence"
+    # end
 
-    should "find sequence is different transcript" do
-      seq1 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTGGAATCGGTGACCGGCATGAATTTGACAGTA"
-      seq2 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTTGGAATCGGTGACCGGCATGAATTTGACAGTA"
-      seq3 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTG"
-      @clust.add_seq 0, seq1
-      @clust.add_seq 1, seq2
-      @clust.add_seq 2, seq3
-      seqs = @clust.extract_seqs
-      assert_equal 2, seqs.size
-      assert_equal seq1, seqs[0], "sequence 1"
-      assert_equal seq2, seqs[1], "sequence 2"
-    end
+    # should "find sequence is different transcript" do
+    #   seq1 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTGGAATCGGTGACCGGCATGAATTTGACAGTA"
+    #   seq2 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTTGGAATCGGTGACCGGCATGAATTTGACAGTA"
+    #   seq3 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTG"
+    #   @clust.add_seq 0, seq1
+    #   @clust.add_seq 1, seq2
+    #   @clust.add_seq 2, seq3
+    #   seqs = @clust.extract_seqs
+    #   assert_equal 2, seqs.size
+    #   assert_equal seq1, seqs[0], "sequence 1"
+    #   assert_equal seq2, seqs[1], "sequence 2"
+    # end
 
-    should "deal with the same kmer appearing twice in a sequence" do
-      seq1 = "TTGGAATCGGTGACCGGCATGAATTTGACAGATT"
-      seq2 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTGGAATCGGTGACCGGCATGAATTTGACAGTA"
-      list = @clust.kmerise 0, seq2
-      assert_equal 38, list.size, "list size"
-      hash={}
-      list.each do |i|
-        hash[i]||=0
-        hash[i] += 1
-      end
-      assert_equal 36, hash.size, "hash size"
-      @clust.add_seq 0, seq1
-      @clust.add_seq 1, seq2
-      seqs = @clust.extract_seqs
-      assert seqs.size > 0, "seq hash size"
-      assert_equal seq2, seqs.to_a.first.last, "seq2"
-    end
+    # should "deal with the same kmer appearing twice in a sequence" do
+    #   seq1 = "TTGGAATCGGTGACCGGCATGAATTTGACAGATT"
+    #   seq2 = "AATTGGAATCGGTGACCGGCATGAATTTGACAGATTGGAATCGGTGACCGGCATGAATTTGACAGTA"
+    #   list = @clust.kmerise 0, seq2
+    #   assert_equal 38, list.size, "list size"
+    #   hash={}
+    #   list.each do |i|
+    #     hash[i]||=0
+    #     hash[i] += 1
+    #   end
+    #   assert_equal 36, hash.size, "hash size"
+    #   @clust.add_seq 0, seq1
+    #   @clust.add_seq 1, seq2
+    #   seqs = @clust.extract_seqs
+    #   assert seqs.size > 0, "seq hash size"
+    #   assert_equal seq2, seqs.to_a.first.last, "seq2"
+    # end
 
     # should "deal with some kmers appearing multiple times" do
     #   seq1 = "GGCGCCATACCCATCTTACGTAATGTCAATAAAAACATGG"
@@ -162,22 +177,22 @@ class TestClustemble < Test::Unit::TestCase
     #   # assert_equal ans, seqs.to_a.first.last, "seq"
     # end
 
-    should "combine overlapping sequences" do
-      # ********----
-      # ----********
-      #             v-----------------seq1----------------v
-      seq0 = "TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
-      #       ^--------------seq2-------------------^
-      seq1 ="TCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
-      seq2 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAG"
-      @clust.add_seq 0, seq1
-      @clust.add_seq 1, seq2
-      assert_equal 17, @clust.graph.size
-      seqs = @clust.extract_seqs
-      assert_equal seq0, seqs.to_a.first.last, "sequence"
-      assert_equal 1, seqs.keys.first
-      assert_equal seq0, seqs.values.first
-    end
+    # should "combine overlapping sequences" do
+    #   # ********----
+    #   # ----********
+    #   #             v-----------------seq1----------------v
+    #   seq0 = "TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+    #   #       ^--------------seq2-------------------^
+    #   seq1 ="TCGGTGACCGGCATGAATTTGACAGAACTCGAGGCGATT"
+    #   seq2 ="TTGGAATCGGTGACCGGCATGAATTTGACAGAACTCGAG"
+    #   @clust.add_seq 0, seq1
+    #   @clust.add_seq 1, seq2
+    #   assert_equal 17, @clust.graph.size
+    #   seqs = @clust.extract_seqs
+    #   assert_equal seq0, seqs.to_a.first.last, "sequence"
+    #   assert_equal 1, seqs.keys.first
+    #   assert_equal seq0, seqs.values.first
+    # end
 
     # should "combine three overlapping sequences " do
     #   seq3 = "CACAAAACTAAGATCTTGTTCATTTCCTATGACAATAACATTATTATAAGCAAATGGCAAA"
